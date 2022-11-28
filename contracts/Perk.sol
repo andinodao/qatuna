@@ -17,7 +17,7 @@ contract Perk is Initializable, OwnableUpgradeable {
         uint256 costInContractToken;
     }
 
-    uint256 public dealId;
+    uint256 public dealId = 0;
 
     mapping(address => mapping(address => uint256)) public exchangeRates;
     mapping(uint256 => Deal) public dealDetails;
