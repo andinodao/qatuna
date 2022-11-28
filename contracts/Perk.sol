@@ -15,6 +15,7 @@ contract Perk is Initializable, OwnableUpgradeable {
         address paymentAddress;
         string description;
         uint256 costInContractToken;
+        uint256 id;
     }
 
     uint256 public dealId = 0;
@@ -31,9 +32,16 @@ contract Perk is Initializable, OwnableUpgradeable {
 
     // verifies can make claim by minting an nft for the user
     function claimPerk(uint256 perkId, address paymentTokenAddress) external {
-        Deal memory dealToClaim = dealDetails[perkId];
+        Deal memory deal = dealDetails[perkId];
 
-        _payDealProvider(paymentTokenAddress, dealToClaim);
+        // if token is not same then u will need to pay dealer by exchanging token
+        bool isExchangeRequired = paymentTokenAddress !=
+            deal.tokenContractAddress;
+        if (isExchangeRequired) {
+            _payDealProvider(paymentTokenAddress, deal);
+        }
+
+        _sendTokens(paymentTokenAddress, deal);
     }
 
     function _sendTokens(address paymentTokenAddress, Deal memory deal)
@@ -45,7 +53,7 @@ contract Perk is Initializable, OwnableUpgradeable {
 
         paymentToken.transferFrom(
             msg.sender,
-            paymentTokenAddress,
+            deal.paymentAddress,
             deal.costInContractToken
         );
     }
@@ -56,16 +64,16 @@ contract Perk is Initializable, OwnableUpgradeable {
         uint256 rate = exchangeRates[paymentTokenAddress][
             deal.tokenContractAddress
         ];
-        require(rate > 0, "no liquidity for payment token provided");
+        require(rate > 0, "no exchange rate for payment token provided");
 
-        ERC20 providerPreferedToken = ERC20(deal.tokenContractAddress);
+        ERC20 tokenOfPayment = ERC20(deal.tokenContractAddress);
 
-        uint256 ourBalance = providerPreferedToken.balanceOf(address(this));
+        uint256 ourBalance = tokenOfPayment.balanceOf(address(this));
 
         uint256 amountToSend = deal.costInContractToken * rate;
         require(ourBalance > amountToSend, "you must have a bigger balance");
 
-        providerPreferedToken.transfer(deal.paymentAddress, amountToSend);
+        tokenOfPayment.transfer(deal.paymentAddress, amountToSend);
     }
 
     // set an exchange rate
@@ -108,7 +116,7 @@ contract Perk is Initializable, OwnableUpgradeable {
         address tokenContractAddress,
         string calldata description,
         uint256 cost
-    ) external {
+    ) external onlyOwner {
         uint256 newId = getDealId();
 
         require(
@@ -122,7 +130,8 @@ contract Perk is Initializable, OwnableUpgradeable {
             tokenContractAddress,
             msg.sender,
             description,
-            cost
+            cost,
+            newId
         );
 
         dealDetails[newId] = newDeal;
