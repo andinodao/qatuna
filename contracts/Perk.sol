@@ -4,7 +4,6 @@ pragma solidity ^0.8.6;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "./Error.sol";
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
@@ -28,7 +27,9 @@ contract Perk is Initializable, OwnableUpgradeable {
 
     event PerkCreated(uint256 id, Deal newDeal);
 
-    constructor() {}
+    constructor() initializer {
+        __Ownable_init();
+    }
 
     // verifies can make claim by minting an nft for the user
     function claimPerk(uint256 perkId, address paymentTokenAddress) external {
@@ -78,12 +79,12 @@ contract Perk is Initializable, OwnableUpgradeable {
 
     // set an exchange rate
     function setExchangeRate(
-        address to, // usdc
         address from, // nupen
+        address to, // usdc
         uint256 rate // 3.8
     ) external onlyOwner {
-        exchangeRates[to][from] = rate;
         exchangeRates[from][to] = 1 / rate;
+        exchangeRates[to][from] = rate;
     }
 
     function getExchangeRage(address to, address from)
