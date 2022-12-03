@@ -17,9 +17,20 @@ contract Perk is Initializable, OwnableUpgradeable {
         uint256 id;
     }
 
-    uint256 public dealId = 0;
+    struct ExchangeRate {
+        uint256 rate;
+    }
+    struct NewExchangeRate {
+        address from;
+        address to;
+        uint256 rate;
+    }
 
-    mapping(address => mapping(address => uint256)) public exchangeRates;
+    mapping(address => mapping(address => ExchangeRate)) public exchangeRates;
+
+    uint256 public dealId = 0;
+    uint256 maxExchangeRate = 100;
+
     mapping(uint256 => Deal) public dealDetails;
     mapping(uint256 => address) public tokenLiquidity;
     mapping(address => uint256[]) public dealsByToken;
@@ -59,19 +70,34 @@ contract Perk is Initializable, OwnableUpgradeable {
         );
     }
 
+    function updateExchangeRates(NewExchangeRate[] calldata newRates) public {
+        for (uint256 i = 0; i < newRates.length; i++) {
+            exchangeRates[newRates[i].from][newRates[i].to].rate = newRates[i]
+                .rate;
+        }
+    }
+
+    function removeExchangeRates(NewExchangeRate[] calldata removedRates)
+        public
+    {
+        for (uint256 i = 0; i < removedRates.length; i++) {
+            exchangeRates[removedRates[i].from][removedRates[i].to].rate = 0;
+        }
+    }
+
     function _payDealProvider(address paymentTokenAddress, Deal memory deal)
         internal
     {
-        uint256 rate = exchangeRates[paymentTokenAddress][
+        ExchangeRate memory rate = exchangeRates[paymentTokenAddress][
             deal.tokenContractAddress
         ];
-        require(rate > 0, "no exchange rate for payment token provided");
+        require(rate.rate > 0, "no exchange rate for payment token provided");
 
         ERC20 tokenOfPayment = ERC20(deal.tokenContractAddress);
 
         uint256 ourBalance = tokenOfPayment.balanceOf(address(this));
 
-        uint256 amountToSend = deal.costInContractToken * rate;
+        uint256 amountToSend = deal.costInContractToken * rate.rate;
         require(ourBalance > amountToSend, "you must have a bigger balance");
 
         tokenOfPayment.transfer(deal.paymentAddress, amountToSend);
@@ -83,8 +109,7 @@ contract Perk is Initializable, OwnableUpgradeable {
         address to, // usdc
         uint256 rate // 3.8
     ) external onlyOwner {
-        exchangeRates[from][to] = 1 / rate;
-        exchangeRates[to][from] = rate;
+        exchangeRates[from][to] = ExchangeRate(rate);
     }
 
     function getExchangeRage(address to, address from)
@@ -92,6 +117,17 @@ contract Perk is Initializable, OwnableUpgradeable {
         view
         returns (uint256 rate)
     {
+        // check if the exchange rate is zero or negative
+        require(rate > 0, "exchange rate must be a positive value");
+        require(rate <= maxExchangeRate, "exchange rate must not exceed max");
+
+        // check if the "from" token is being used by any perks
+        // uint256[] memory perkIds = dealsByToken[from];
+        // require(
+        //     perkIds.length > 0,
+        //     "token is not being used by any perks: " + from
+        // );
+
         return _getExchangeRage(to, from);
     }
 
@@ -100,9 +136,9 @@ contract Perk is Initializable, OwnableUpgradeable {
         view
         returns (uint256 rate)
     {
-        require(exchangeRates[from][to] > 0, "No exchange rate set");
+        require(exchangeRates[from][to].rate > 0, "No exchange rate set");
 
-        return exchangeRates[from][to];
+        return exchangeRates[from][to].rate;
     }
 
     /**
@@ -120,9 +156,12 @@ contract Perk is Initializable, OwnableUpgradeable {
     ) external onlyOwner {
         uint256 newId = getDealId();
 
+        // check if a deal already exists with the specified id
+        Deal memory existingDeal = dealDetails[newId];
+
         require(
-            dealDetails[newId].costInContractToken != 0,
-            "a deal already exists with this id"
+            existingDeal.costInContractToken == 0,
+            "a deal already exists with id"
         );
 
         _checkValidERC20(tokenContractAddress);
