@@ -10,10 +10,10 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract Perk is Initializable, OwnableUpgradeable {
     struct Deal {
-        address tokenContractAddress;
-        address paymentAddress;
-        string description;
-        uint256 costInContractToken;
+        address tokenContractAddress; // usdc
+        address paymentAddress; // miwallet.eth
+        string description; // 40 cockteles
+        uint256 costInContractToken; // 100.00
         uint256 id;
     }
 
@@ -49,6 +49,7 @@ contract Perk is Initializable, OwnableUpgradeable {
         // if token is not same then u will need to pay dealer by exchanging token
         bool isExchangeRequired = paymentTokenAddress !=
             deal.tokenContractAddress;
+
         if (isExchangeRequired) {
             _payDealProvider(paymentTokenAddress, deal);
         }
